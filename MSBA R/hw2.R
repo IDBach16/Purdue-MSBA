@@ -2,10 +2,6 @@
 
 library(readxl)
 
-setwd("C:\\Users\\jhalsey\\Downloads")
-
-tr <- read_xlsx(path = "C:\\Users\\jhalsey\\Downloads\\train.xlsx")
-
 tr$...1 = NULL
 
 
