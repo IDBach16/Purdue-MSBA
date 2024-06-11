@@ -1,0 +1,1109 @@
+rm(list=ls())
+
+################################################################################
+# MGMT 590 Using R for Analytics
+# Team Assignment #3
+# Due: October 7, 2020 11:59pm
+#
+# Are you in the 2:50-4:20 or 4:30-6:00pm section: ______Online___________________
+#
+# Team #:______2_________________________________________________
+#
+#
+# Submission instructions: This assignment must be completed with your assigned 
+# team with no help from others. Only one person from your team will submit your 
+# team's solutions to Brightspace on time. It is due by Wednesday, October 7th, 
+# 2020 by Midnight. Late submissions for any reason will be subject to a 25% 
+# late penalty per day past due. No Brightspace, Scholar, or other excuses.
+#
+# While there is only one team submission, everyone should try to answer the 
+# questions on their own and when in doubt discuss with your teammates. This 
+# is the only way you will truly learn the R language. Assigning people to do 
+# certain questions of the homework is a bad strategy to prepare you for the 
+# final exam. 
+# 
+# Please put all your answers in the ur4a_hw3.R script. This script should 
+# clearly show which question you are answering and have comments where you 
+# need to comment to answer the question provided. Some questions will ask you 
+# to provide output. In those cases, copy and paste the output into your R script
+# and then comment it out.
+#
+# All work should be done using RStudio Server via Scholar
+################################################################################
+################################################################################
+# Case: Your boss has tasked with you learning how to do descriptive, predictive,
+# and prescriptive analytics using RStudio Server. He heard many great data 
+# scientists learn from participating in competitions at Kaggle.com. He has 
+# ask that you participate in the "House Prices: Advanced Regression Techniques"
+# competition to learn R and build predictive models.
+# https://www.kaggle.com/c/house-prices-advanced-regression-techniques
+# The training and scoring data from this competition is saved on your companies
+# MySQL database server and can be accessed using the lines 42 thru 56 below.
+#
+# set memory limits
+
+# install.packages("mice")
+# 
+# install.packages("lme4")
+# install.packages("Matrix")#, "ABI"))
+# 
+# options(java.parameters = "-Xmx64048m") # 64048 is 64 GB
+# # Connect to our MySQL on the servrer
+# install.packages("odbc")
+# install.packages("RMariaDB", configure.vars=c("INCLUDE_DIR=/usr/include/mysql LIB_DIR=/usr/lib64/mysql"))
+# 
+# library(RMariaDB)
+# # Connect to a MariaDB version of a MySQL database
+# # Do not change the user id or password; Leave it as gen_user
+# con <- dbConnect(RMariaDB::MariaDB(), host="datamine.rcac.purdue.edu", port=3306
+#                  , dbname="khou", user="gen_user", password="gen_user")
+
+
+# pull in the training data into a data.frame called tr and kaggle evaluation
+# # set called 'te'
+# tr <- dbGetQuery(con, "select * from train")
+# te <- dbGetQuery(con, "select * from test")
+# # disconnect from db
+# dbDisconnect(con)
+setwd("C:/Users/ibach/OneDrive - Terillium/Desktop/Purdue MSBA/R for Analytics/Hws/HW3")
+getwd()
+tr <- read.table("train.csv", header=T, sep=",")
+te <- read.table("test.csv", header=T, sep=",")
+
+
+tr[1]<-NULL
+te[1]<-NULL
+
+################################################################################
+## Data Cleaning
+################################################################################
+# You cannot create variable names in R that begin with a number or underscore.
+# However, since we pulled this data in from a database, it allowed a couple
+# columns to slip by. This can cause us issues later on, so lets fix the following
+# column names (1stFlrSF, 2ndFlrSF, 3SsnPorch) to (FstFlrSF, SecFlrSf, ThiSsnPorch)
+names(tr)
+names(tr)[44] <- "FstFlrSF"; names(te)[44] <- "FstFlrSF"
+names(tr)[45] <- "SecFlrSf"; names(te)[45] <- "SecFlrSf"
+names(tr)[70] <- "ThiSsnPorch"; names(te)[70] <- "ThiSsnPorch"
+names(tr)
+# Whenever we make changes to our kaggle 'train' set we need to make sure we
+# do similar changes to our 'submission' dataset called 'te'.
+
+# One thing you might notice is that some of the columns show NA implying that
+# there are missing values. However, this is misleading as in the database they
+# were stored as literal NA values instead of missing values. Some of the values
+# indeed should be missing, and I show below how I corrected these for each
+# field.
+
+# Features where 'NA' is really a missing value, make them blank
+# LotFrontage, MasVnrType, MasVnrArea, Electrical, GarageYrBlt
+realBlanks <- c("LotFrontage", "MasVnrType", "MasVnrArea", "Electrical"#Electrical doesn't exist
+                , "GarageYrBlt")
+# Function to check if all columns exist in a dataframe
+check_columns_exist <- function(df, cols) {
+  all(cols %in% colnames(df))
+}
+# Check if columns exist in both dataframes
+if (!check_columns_exist(tr, realBlanks)) {
+  stop("Some columns in 'realBlanks' do not exist in 'tr' dataframe")
+}
+if (!check_columns_exist(te, realBlanks)) {
+  stop("Some columns in 'realBlanks' do not exist in 'te' dataframe")
+}
+
+# loop through each field and make 'NA' values missing values
+for (i in 1:length(realBlanks)){
+  tr[which(tr[,realBlanks[i]]=='NA'),realBlanks[i]] <- NA 
+  te[which(te[,realBlanks[i]]=='NA'),realBlanks[i]] <- NA 
+}
+
+# Features where 'NA' is a meaningful factor level, we will keep them. These are:
+# Alley, BsmtQual, BsmtCond, BsmtExposure, BsmtFinType1, BsmtFinType2, FireplaceQu,
+# GarageType, GarageFinish, GarageQual, GarageCond, PoolQC, Fence, MiscFeature
+
+# You read about the dataset by reviewing the data dictionary for this data located
+# here: https://www.kaggle.com/c/house-prices-advanced-regression-techniques/data
+# Based on your understanding of data, you coerced every variable in the 'tr' dataset
+# to the correct R data type it should be for proper data analysis. Last assignment
+# this required using several repetitive 'as.' functions to corerce each column
+# to the approriate type. However you might do this using a for loop.
+str(tr)
+# corece these fields to numeric vectors
+tr$LotFrontage <- as.numeric(tr$LotFrontage)
+tr$GarageYrBlt <- as.numeric(tr$GarageYrBlt)
+tr$MasVnrArea <- as.numeric(tr$MasVnrArea)
+
+te$LotFrontage <- as.numeric(te$LotFrontage)
+te$GarageYrBlt <- as.numeric(te$GarageYrBlt)
+te$MasVnrArea <- as.numeric(te$MasVnrArea)
+
+# Write a for loop that coerces the following fields to factor types:
+#"MSSubClass","MSZoning","Street","Alley","LotShape","LandContour","Utilities",
+#"LotConfig","LandSlope","Neighborhood","Condition1","Condition2","BldgType",
+#"HouseStyle","RoofStyle","RoofMatl","Exterior1st","Exterior2nd","MasVnrType",
+#"ExterQual","ExterCond","Foundation", "BsmtQual","BsmtCond",
+#"BsmtExposure", "BsmtFinType1","BsmtFinType2","Heating","HeatingQC","CentralAir",
+#"Electrical","KitchenQual","Functional","FireplaceQu","GarageType","GarageFinish",
+#"GarageQual","GarageCond","PavedDrive","PoolQC","Fence","MiscFeature","SaleType",
+#"SaleCondition"
+
+s <- c("MSSubClass","MSZoning","Street","Alley","LotShape","LandContour","Utilities",
+       "LotConfig","LandSlope","Neighborhood","Condition1","Condition2","BldgType",
+       "HouseStyle","RoofStyle","RoofMatl","Exterior1st","Exterior2nd","MasVnrType",
+       "ExterQual","ExterCond","Foundation", "BsmtQual","BsmtCond",
+       "BsmtExposure", "BsmtFinType1","BsmtFinType2","Heating","HeatingQC","CentralAir",
+       "Electrical", #doesn't exist in tr or te - fixed by downloading new files
+       "KitchenQual","Functional","FireplaceQu","GarageType","GarageFinish",
+       "GarageQual","GarageCond","PavedDrive","PoolQC","Fence","MiscFeature","SaleType",
+       "SaleCondition")
+for (i in 1:length(s)){
+  tr[,s[i]] <- as.factor(tr[,s[i]])
+  te[,s[i]] <- as.factor(te[,s[i]])
+}
+str(tr)
+
+# For the missing GarageYrBlt values, replace those with the YearBuilt value.
+tr$GarageYrBlt <- ifelse(is.na(tr$GarageYrBlt), tr$YearBuilt, tr$GarageYrBlt)
+te$GarageYrBlt <- ifelse(is.na(te$GarageYrBlt), te$YearBuilt, te$GarageYrBlt)
+
+# MasVnrType and MasVnrArea both have missing values. Tweak your answers 
+# in Q2 and Q3 to show that 1) MasVnrType NA values and MasVnrArea NA values
+# correspond to the same rows, and 2) assume that the MasVnrType missing values
+# should be adjusted to 'None' and MasVnrArea values to 0. The MasVnrType should
+# still be a factor vector with the same factor levels as before.
+sum(ifelse(is.na(tr$MasVnrType) & is.na(tr$MasVnrArea), 1, 0))
+tr$MasVnrType <- as.factor(ifelse(is.na(tr$MasVnrType),as.character("None")
+                                  ,as.character(tr$MasVnrType)))
+tr$MasVnrArea <- ifelse(is.na(tr$MasVnrArea), 0, tr$MasVnrArea)
+
+te$MasVnrType <- as.factor(ifelse(is.na(te$MasVnrType),as.character("None")
+                                  ,as.character(te$MasVnrType)))
+te$MasVnrArea <- ifelse(is.na(te$MasVnrArea), 0, te$MasVnrArea)
+
+# remove the Id column in tr; Don't remove the id column from the 'te' set as 
+# you will need it later to submit your predictions to Kaggle
+tr$Id <- NULL
+
+###############################################################################
+# Imputing missing values using a predictive model-based imputation approach for
+# both the tr and te data.frames.
+###############################################################################
+# LotFrontage and Electrical features have missing values
+sapply(tr, function(x) sum(is.na(x)))
+sapply(te, function(x) sum(is.na(x)))
+
+#Adding this snippet from the lecture example
+####################################################################
+
+# too many missing values
+tr$Alley <- NULL
+tr$PoolQC <- NULL
+tr$Fence <- NULL
+tr$MiscFeature <- NULL
+tr$FireplaceQu <- NULL
+# if you delete columns from train set, do so for test set too
+te$Alley <- NULL
+te$PoolQC <- NULL
+te$Fence <- NULL
+te$MiscFeature <- NULL
+te$FireplaceQu <- NULL
+
+# Identify integer vectors 
+integer_columns <- sapply(tr, function(col) is.integer(col))
+(tr_integer_columns <- names(tr)[integer_columns])
+
+te_integer_columns <- sapply(te, function(col) is.integer(col))
+(te_integer_columns <- names(te)[te_integer_columns])
+
+#############################################################################
+
+
+library(mice)    # call the mice library so we can use the functions in this library
+?mice            # tells you a bit about the mice() function
+
+# here we use a decision tree predictive model approach to predict the missing
+# values for LotFrontage and Electrical. The algorithm used is "cart" which stands 
+# for "Classification And Regression Trees".
+imputedValues <- mice(data=tr
+                      , seed=2016     # keep to replicate results
+                      , method="cart" # model you want to use
+                      , m=1           # Number of multiple imputations
+                      , maxit = 1     # number of iterations
+)
+# impute the missing values in our tr data.frame
+tr <- mice::complete(imputedValues,1) # completely fills in the missing
+
+imputedValues <- mice(data=te
+                      , seed=2016     # keep to replicate results
+                      , method="cart" # model you want to use
+                      , m=1           # Number of multiple imputations
+                      , maxit = 1     # number of iterations
+)
+# impute the missing values in our tr data.frame
+te <- mice::complete(imputedValues,1) # completely fills in the missing
+
+# LotFrontage and Electrical features no longer have missing values
+sapply(tr, function(x) sum(is.na(x)))
+sapply(te, function(x) sum(is.na(x)))
+
+# create a dataset called d so I don't have to change alot of code later in 
+# in my script
+d <- tr
+
+# Make target variable first column in dataset
+d <- d[,c(75,1:74)]
+
+# Make target (SalePrice) column name "y"
+names(d)[1] <- "y"
+names(d)
+
+# clean up my R environment
+rm(tr, con, drv, i, realBlanks, s, imputedValues) #drv won't exist if you use the csv file, but command still works.
+################################################################################
+## Predictive Modeling using caret
+################################################################################
+
+################################################################################
+# Q1 - Using the dummyVars() function, create one-hot encoded variables for all
+# the categorical variables. Do this for both the 'd' data.frame and 'te' set
+################################################################################
+
+
+summary(d)
+#Utilities
+#AllPub:1457 
+#NoSeWa:   1
+summary(te)
+#Utilities
+#AllPub:1457 
+#NA's  :   2
+d$Utilities <- NULL
+te$Utilities <- NULL
+
+str(d)
+# d set
+library(caret)
+dummies <- dummyVars(y ~ ., data = d)            # create dummies for Xs
+ex <- data.frame(predict(dummies, newdata = d))  # actually creates the dummies
+names(ex) <- gsub("\\.", "", names(ex))          # removes dots from col names
+d <- cbind(d$y, ex)                              # combine target var with Xs
+names(d)[1] <- "y"                               # name target var 'y'
+rm(dummies, ex)                                  # clean environment
+str(d)
+
+# te set
+dummies <- dummyVars(~ ., data = te)            # create dummies for Xs
+te <- data.frame(predict(dummies, newdata = te))  # actually creates the dummies
+names(te) <- gsub("\\.", "", names(te))          # removes dots from col names
+rm(dummies)
+
+#some factors values used in tr may not be in te, put them in so the models
+#match later. If any columns in tr that are used in the model are missing from
+#te, the predict() function in Q11 will fail. 
+missing_cols <- setdiff(names(d), names(te))
+print(missing_cols)
+
+# Add missing columns to te with 0 as the value -- we know it's 0 because these
+# are missing factors from tr that were not present in te, meaning another factor
+# was selected for the related factor fields.
+for (col in missing_cols) {
+  te[[col]] <- 0
+}
+te$y=NULL
+
+
+################################################################################
+# Q2 - Identify correlated variables in the 'd' dataset that are less than or 
+# greater than 80% and remove them. You don't need to do this on the 'te' dataset
+################################################################################
+
+# Calculate the correlation matrix using Pearson"s correlation formula
+descrCor <- cor(d[,2:ncol(d)])
+highCorr <- sum(abs(descrCor[upper.tri(descrCor)]) > 0.80)
+summary(descrCor[upper.tri(descrCor)])
+
+
+# Find highly correlated predictors (correlation cutoff of 0.80)
+highlyCorDescr <- findCorrelation(descrCor, cutoff=0.80)
+filteredDescr <- d[,2:ncol(d)][, -highlyCorDescr] #remove specified columns
+descrCor2 <- cor(filteredDescr) #calculate a new correlation matrix
+#summarize those correlations to see if all features are now within our range
+summary(descrCor2[upper.tri(descrCor2)])
+
+d <- cbind(d$y, filteredDescr)
+
+names(d)[1]<-"y" # name target var back to y
+
+rm(filteredDescr, descrCor2, descrCor, highCorr, highlyCorDescr) #cleanup
+# print("Reduced Dataset with Less Correlated Variables:")
+print(d)
+
+
+################################################################################
+# Q3 - identify linear dependencies and remove them to reduce the issue of 
+# perfect collinearity using the findLinearCombos() function. Do this on the 
+# 'd' data.frame only.
+################################################################################
+linear_combos <- findLinearCombos(d)
+if (length(linear_combos$remove) > 0) {
+  d <- d[, -linear_combos$remove]
+}
+print("Dataset with Linear Dependencies Removed:")
+print(d)
+
+
+################################################################################
+# Q4 - remove features with limited variation using nearZeroVar() from the 'd'
+# data.frame the way I showed in the notes. However, first look at the head of 
+# nzv by using head(nzv), and remove columns where nzv equals to TRUE. This 
+# means you need to modify this line of code (d <- d[, c(TRUE,!nzv$zeroVar[2:ncol(d)])])
+# somehow. You do not need to remove anything from 'te'.
+################################################################################
+nzv <- nearZeroVar(d, saveMetrics = TRUE)
+
+# Look at the head of nzv to understand the metrics
+head(nzv)
+
+# Remove columns with near-zero variance from 'd'
+d <- d[, !nzv$zeroVar]
+
+rm(linear_combos, nzv)
+
+################################################################################
+# Q5 - using preProcess(), standardize your numeric features using a min-max 
+# normalization. Do this for both the 'd' and 'te' data sets. 
+# hint: Remember, the 'te' dataset does not have a Y column and you should not
+#       transform the Id column because you are not using that for modeling, but
+#       to submit predictions for each Id later.
+################################################################################
+preProcValues <- preProcess(d[,2:ncol(d)], method = c("range"))
+d <- predict(preProcValues, newdata = d)
+
+
+preProcValues_te <- preProcess(te[, -which(names(te) == "Id")], method = c("range"))
+
+# Step 4: Apply pre-processing to 'te' and ensure 'Id' column remains unchanged
+te_normalized <- predict(preProcValues_te, newdata = te[, -which(names(te) == "Id")])
+te <- cbind(te["Id"], te_normalized)
+
+################################################################################
+# Q6 - Create a 90/10 train/test set using createDataPartition(). Discuss why
+# you the function requires you to specify your target variable column. What
+# kind of random sampling is going on?
+################################################################################
+#identify records that will be used in the training set. 
+trainIndex <- createDataPartition(y=d$y, #outcome variable 
+                                  p = 0.90,  # % of ttraining data you want
+                                  list = F) 
+#$create the partitions
+train <- d[trainIndex, ]
+test <- d[-trainIndex, ]
+
+
+print("Training Set:")
+print(train)
+
+print("Testing Set:")
+print(test)
+
+#the createDataPartition() method is using stratified partitioning as the sample
+#method. It requres you to specifiy the target variable so that both test and
+#train will contain an evenly dispersed value for y, which is particularly 
+#important for datasets that are imbalanced. It ensures that training and test
+#are equally representative of the dataset.
+
+################################################################################
+# Q7 - Using trainControl(), specify a 5-fold cross-validation design.
+################################################################################
+train_control <- trainControl(method = "cv", # cross-validation set approach to use
+                              number = 5, # k number of times to do a k-fold
+                              classProbs = F, # F for regression, T for classification
+                              #summaryFunction = twoClassSummary, #for classifictation
+                              summaryFunction = defaultSummary, #for regression
+                              allowParallel = T)
+
+# Display the trainControl settings
+print("Train Control Settings for 5-Fold Cross-Validation:")
+print(train_control)
+
+#cleanup
+rm(trainIndex)
+
+
+################################################################################
+# Q8 -  train a linear regession model on the train set using the train() function.
+# Call your model 'm1'. Use RMSE as your metric.
+################################################################################
+m1 <- train(y ~ .,                     #model specification
+            data = train,                  #train set used to build the model
+            method = "lm",            #type of model you want to build
+            trControl = train_control, #how you want to learn
+            #family = "gaussian"#,       #type of glm
+            metric = "RMSE"              #performance measure
+)
+
+# Display the trained linear regression model
+print("Trained Linear Regression Model:")
+print(m1)
+
+
+################################################################################
+# Q9 -  train a linear regession model on the train set using the train() function.
+# However, for this model try to take the log(y) as your target variable when
+# you train your model. Call your model 'm2'. Use RMSE as your metric.
+################################################################################
+
+m2 <- train(log(y) ~ .,          # model specification
+            data = train,        # train set used to build model
+            method = "lm",       # type of model you want to build
+            trControl = train_control,    # how you want to learn
+            metric = "RMSE"  # performance measure
+)
+summary(m2)
+
+names(te)
+# summary(te$HouseStyle)
+# summary(d$HouseStyle)
+str(d)
+
+################################################################################
+# Q10 (2 points) - using the defaultSummary() function, evaluate the performance 
+# of the train and test sets for both models. Based on the RMSE values, are any 
+# models overfit? Also, which model is "best"? Justify the reasoning for your 
+# answers based on the statistics.
+################################################################################
+
+options(scipen=999) # removes scientific notation in outputs
+# m1 train
+defaultSummary(data=data.frame(obs=train$y, pred=predict(m1, newdata=train)), model=m1)
+# m1 test 
+defaultSummary(data=data.frame(obs=test$y, pred=predict(m1, newdata=test)), model=m1)
+
+# m2 train
+defaultSummary(data=data.frame(obs=log(train$y)
+                               , pred=predict(m2, newdata=train)), model=m2)
+# m2 test 
+defaultSummary(data=data.frame(obs=log(test$y)
+                               , pred=predict(m2, newdata=test)), model=m2)
+
+
+################################################################################
+# Q11 (2 points) - generate predictions using the predict() function on the 'te' data.frame
+# using the best model you found from the previous question. These values should
+# be saved in a numeric vector called 'preds'. Next, create a new data.frame
+# called 'results' that has the 'Id' column from the 'te' data.frame in the first
+# column and 'preds' in the second column. The column names for the results table
+# should be c("Id","SalePrice"). Lastly, write this out into a comma-seperated
+# file called "results.csv" using the write.table() function. Make sure you
+# specify row.names=F and sep="," as arguments in your write.table function.
+################################################################################
+
+
+preds <- predict(m2, newdata=te)
+results <- data.frame(Id=te$Id, SalePrice=exp(preds))
+head(results)
+getwd()
+#setwd("/home/lanhamm/fall2019_UR4A/HW3")
+write.table(x=results, sep=",", file="results.csv", row.names=F)
+
+
+################################################################################
+# Q12 - Go to https://www.kaggle.com/c/house-prices-advanced-regression-techniques/submit
+# to upload your "results.csv" file for the Kaggle competition. Report your rank
+# and score below. If you click on 'Jump to your position on the leaderboard'.
+# it will show your rank.
+# Note: You will need to create a Kaggle account (which is Free) and join the 
+# competition to submit your predictions.
+################################################################################
+# student should show a rank and score 
+
+#Rank: 3432
+#Name: Jacob Halsey
+# Score 0.16122
+#Emtries 1
+#last 32s
+
+
+################################################################################
+## Clustering
+#
+# Assuming your properly standardized your features using a min-max normalization
+# in the previous prediction problem above, you are going to perform clustering here
+# using the train and test set you already created.
+################################################################################
+
+################################################################################
+# Q13 (3 points) - write a for loop that performs k-means clustering on your train set, as
+# well as your test set you created from your previous problems. The loop should
+# run from k=1 to 10. Have the number of random starts be 25 and the maximum number 
+# of algorithm iterations set at 100. Plot the total within sum of squared errors
+# in an elbox plot. Use a seed of 123.
+# Based on your elbow plot, does the clustering in a train and test set appear
+# to be replicable? Explain what you observed and justify why you believe the
+# results turned out the way that they did.
+################################################################################
+#run kmeans for diff values of k so we can identify performance by # of clusters
+set.seed(123)  # set this to replicate results
+
+# Function to calculate WCSS for a given range of k values
+library(ggplot2)
+library(scales)
+library(cowplot)
+library(stats)
+
+# Set random seed for reproducibility
+set.seed(123)
+
+# Function to calculate WCSS for a given range of k values
+calculate_wcss <- function(data, k_range) {
+  wcss <- numeric(length(k_range))
+  for (i in seq_along(k_range)) {
+    kmeans_result <- kmeans(data, centers = k_range[i], nstart = 25, iter.max = 100)
+    wcss[i] <- kmeans_result$tot.withinss
+  }
+  return(wcss)
+}
+
+
+# Define the range for k
+k_range <- 1:10
+
+# Calculate WCSS for train and test sets
+wcss_train <- calculate_wcss(train, k_range)
+wcss_test <- calculate_wcss(test, k_range)
+
+# Plot the elbow plot
+ggplot() +
+  geom_line(aes(x = k_range, y = wcss_train, color = "Train WCSS"), size = 1) +
+  geom_line(aes(x = k_range, y = wcss_test, color = "Test WCSS"), size = 1) +
+  scale_color_manual(values = c("Train WCSS" = "blue", "Test WCSS" = "red")) +
+  labs(x = "Number of Clusters (k)", y = "Within-Cluster Sum of Squares (WCSS)",
+       title = "Elbow Plot for Train and Test Sets") +
+  theme_minimal()
+
+
+#both elbow plots show significant drops in WCSS initially around k=1 to 3,
+#indicating adding clusters up until this point has a significant impact.
+#however, both lines flatten around k=3, suggesting neither would benefit
+#substantially by increasing clusters.
+
+#the shapes of the curves and the bend points are similar, suggesting
+#that the clustering results are explicable between the data sets. If the 
+#clusters were not generalizing, we would expect to see deviation, such as
+#significantly different bend points in the elbow plots.
+
+
+################################################################################
+# Q14 -Write another for loop that runs k-means algorithm on the entire 'd' dataset on
+# the input variables. Don't create a train or test set. Have the number of starts
+# and max iterations be the same as in the previous problem. Run this for k=1 to 100.
+# Based on your elbow plot, identify two possible k values that might lead to
+# a good clustering. This is subjective - justify your answer.
+################################################################################
+
+#the function int he prior method still works, so we just need to pass new
+#arguments to it.
+
+#Define the range for k (1 to 100)
+k_range <- 1:100
+
+# Calculate WCSS for the entire dataset 'd'
+wcss_d <- calculate_wcss(d, k_range)
+
+# Plot the elbow plot
+ggplot(data.frame(k = k_range, wcss = wcss_d), aes(x = k, y = wcss)) +
+  geom_line(color = "blue", size = 1) +
+  labs(x = "Number of Clusters (k)", y = "Within-Cluster Sum of Squares (WCSS)",
+       title = "Elbow Plot for Entire Dataset 'd'") +
+  theme_minimal()
+
+#12 and 25 might be k-values that would lead to good clustering. the elbow plot#
+#begins to bend towards flat around 12, but is pretty much finished reducing
+#the slope at 25. Piror to 12, the slope is almost vertical, and after 25, it's
+#fairly constant.  Based on my understanding of the elbow plot, the ideal 
+#K-value is near where the elbow bends flat, so I would expect it to be between 
+#these two values.
+
+################################################################################
+# Q15 - Perform k-means clustering on the 'd' dataset only on the input variables 
+# with the k values you determined in the previous question. Use the same number of 
+# starts and max iterations. Once you run these two models, clearly show the
+# model parameters for each k-means model.
+################################################################################
+
+# Set random seed for reproducibility
+set.seed(123)
+
+# Perform k-means clustering with k = 12
+kmeans_d_12 <- kmeans(d, centers = 12, nstart = 25, iter.max = 100)
+
+# Perform k-means clustering with k = 25
+kmeans_d_25 <- kmeans(d, centers = 25, nstart = 25, iter.max = 100)
+
+# Show model parameters for each k-means model
+print("K-Means Model with k = 12:")
+print(kmeans_d_12)
+
+print("K-Means Model with k = 25:")
+print(kmeans_d_25)
+
+################################################################################
+# Q16 - Visually inspect the cluster formations you obtained in the previous
+# question using the 'useful' library. Plot the clusterings in one figure by 
+# sourcing the multiplot.R function and calling it.
+################################################################################
+source("multiplot.R")
+library(useful)
+
+
+p12 <- plot(kmeans_d_12, data=d)
+p25 <- plot(kmeans_d_25, data=d)
+
+plots <- list(p12,p25)
+
+multiplot(plotlist=plots, cols=2)
+################################################################################
+# Q17 (2 points) - Create silhoutte plots for the two k's you identified previously using the 
+# same settings used previously. Based on the output of these plots, justify
+# which k is "best"? If it is inconclusive explain why.
+################################################################################
+library(cluster)
+
+# Calculate silhouette scores for k = 12
+silhouette_12 <- silhouette(kmeans_d_12$cluster, dist(d))
+
+# Plot silhouette plot for k = 12
+plot(silhouette_12, main = "Silhouette Plot for k = 12")
+
+# Calculate silhouette scores for k = 25
+silhouette_25 <- silhouette(kmeans_d_25$cluster, dist(d))
+
+# Plot silhouette plot for k = 25
+plot(silhouette_25, main = "Silhouette Plot for k = 25")
+
+#k=25 has an average silhouette width of 0.54, which is slightly higher than
+#the silhouette width of k-12, which is 0.53. They're so close together that
+#there is likely little difference in the clustering, but k=25 is the slightly
+#better scenario. We therefore reccomend a K-value of 25.
+
+
+################################################################################
+## Predictive Modeling using H2O
+################################################################################
+
+################################################################################
+# Q18 - Initialize your h2o cluster in RStudio Server by specifying you want
+# 12 cores (i.e. nthreads) and a max memory of 64 GB. Next, load your 'd' data.frame
+# into the h2o cluster.
+################################################################################
+# initialize cluster
+library(h2o)
+#I'm not using scholar, so I set it to 10g, which is what I have available on 
+#my machine
+h2o.init(nthreads=12, max_mem_size="10g")
+
+#h2o.init(nthreads=12, max_mem_size="64g") ##as requested for scholar
+
+# load data into h2o cluster
+data <- as.h2o(d)
+
+################################################################################
+# Q19 (3 points) - using setdiff() and h2o.splitFrame functions, partition your data set
+# into an 80/20 split. Use a seed of 99. Next, train a Random Forest, Deep Learning,
+# and Gradient Boosting Machine model. Using h2o.performance() show the performance
+# on the train and test sets for all three models. Add your outputs into the
+# R script and comment them out. Explain which are "candidate models" (i.e. not
+# over fit) based on RMSE, and which one performed the "best". Justify your answers.
+################################################################################
+
+y <- "y"                                      # target variable to learn
+x <- setdiff(names(data), y)                  # features are all other columns
+parts <- h2o.splitFrame(data, 0.8, seed=99) # randomly partition data into 80/20
+train <- parts[[1]]                           # random set of training obs
+test <- parts[[2]]                            # random set of testing obs
+
+
+
+# train with AutoML - specify how long you are willing to wait
+#auto <- h2o.automl(x, y, train, max_runtime_secs=30)
+#auto
+#str(auto)
+
+# Train Random Forest
+rf_model <- h2o.randomForest(x = x, y = y, training_frame = train, seed = 99)
+
+# Train Deep Learning
+dl_model <- h2o.deeplearning(x = x, y = y, training_frame = train, seed = 99)
+
+# Train Gradient Boosting Machine
+gbm_model <- h2o.gbm(x = x, y = y, training_frame = train, seed = 99)
+
+
+# Show performance on train and test sets for Random Forest
+rf_perf_train <- h2o.performance(rf_model, train)
+rf_perf_test <- h2o.performance(rf_model, test)
+print(rf_perf_train)
+print(rf_perf_test)
+
+# Show performance on train and test sets for Deep Learning
+dl_perf_train <- h2o.performance(dl_model, train)
+dl_perf_test <- h2o.performance(dl_model, test)
+print(dl_perf_train)
+print(dl_perf_test)
+
+# Show performance on train and test sets for GBM
+gbm_perf_train <- h2o.performance(gbm_model, train)
+gbm_perf_test <- h2o.performance(gbm_model, test)
+print(gbm_perf_train)
+print(gbm_perf_test)
+
+#performance output:
+########################################################################
+# H2ORegressionMetrics: drf
+# 
+# MSE:  144611041
+# RMSE:  12025.43
+# MAE:  6846.309
+# RMSLE:  0.06368055
+# Mean Residual Deviance :  144611041
+# 
+# > print(rf_perf_test)
+# H2ORegressionMetrics: drf
+# 
+# MSE:  995517486
+# RMSE:  31551.82
+# MAE:  17464.77
+# RMSLE:  0.1541466
+# Mean Residual Deviance :  995517486
+# 
+# > 
+#   > # Show performance on train and test sets for Deep Learning
+#   > dl_perf_train <- h2o.performance(dl_model, train)
+# > dl_perf_test <- h2o.performance(dl_model, test)
+# > print(dl_perf_train)
+# H2ORegressionMetrics: deeplearning
+# 
+# MSE:  969257090
+# RMSE:  31132.89
+# MAE:  25601.27
+# RMSLE:  0.2081723
+# Mean Residual Deviance :  969257090
+# 
+# > print(dl_perf_test)
+# H2ORegressionMetrics: deeplearning
+# 
+# MSE:  2007750494
+# RMSE:  44807.93
+# MAE:  33232.72
+# RMSLE:  0.2697588
+# Mean Residual Deviance :  2007750494
+# 
+# > 
+#   > # Show performance on train and test sets for GBM
+#   > gbm_perf_train <- h2o.performance(gbm_model, train)
+# > gbm_perf_test <- h2o.performance(gbm_model, test)
+# > print(gbm_perf_train)
+# H2ORegressionMetrics: gbm
+# 
+# MSE:  246344476
+# RMSE:  15695.36
+# MAE:  10585.63
+# RMSLE:  0.09219606
+# Mean Residual Deviance :  246344476
+# 
+# > print(gbm_perf_test)
+# H2ORegressionMetrics: gbm
+# 
+# MSE:  1160247113
+# RMSE:  34062.4
+# MAE:  18381.64
+# RMSLE:  0.1537436
+# Mean Residual Deviance :  1160247113
+###############################################################################
+
+# Evaluate models based on RMSE to determine candidate models and the best performer
+rf_rmse_train <- h2o.rmse(rf_perf_train)
+rf_rmse_test <- h2o.rmse(rf_perf_test)
+
+dl_rmse_train <- h2o.rmse(dl_perf_train)
+dl_rmse_test <- h2o.rmse(dl_perf_test)
+
+gbm_rmse_train <- h2o.rmse(gbm_perf_train)
+gbm_rmse_test <- h2o.rmse(gbm_perf_test)
+
+
+#there are two criteria when evaluating with RMSE. At face value, the model
+#with the lowest RMSE indicates the model which has learned the datset the best,
+#and would generally be the best model. However, the second critiera would be
+#that the model is not overfit; we determine this by looking at the difference
+#between the RMSE of the train set and the test set for each model. The closest
+#model there would be the least overtrained. 
+
+# Determine candidate models (not overfit) and the best model
+# A model is considered a candidate if its train and test RMSE values are close
+# The best model among the candidates would then the lowest test RMSE
+#the differences were quite high in my inital run, so we will set a high
+#threshold
+threshold <- 18000
+
+# Check if models are candidate models (they're under our threshold for overfit)
+rf_candidate <- abs(rf_rmse_train - rf_rmse_test) < threshold
+dl_candidate <- abs(dl_rmse_train - dl_rmse_test) < threshold
+gbm_candidate <- abs(gbm_rmse_train - gbm_rmse_test) < threshold
+
+print(paste("Random Forest is a candidate model:", rf_candidate))
+print(paste("Deep Learning is a candidate model:", dl_candidate))
+print(paste("GBM is a candidate model:", gbm_candidate))
+
+################################Output#####################################
+# > print(paste("Random Forest is a candidate model:", rf_candidate))
+# [1] "Random Forest is a candidate model: FALSE"
+# > print(paste("Deep Learning is a candidate model:", dl_candidate))
+# [1] "Deep Learning is a candidate model: TRUE"
+# > print(paste("GBM is a candidate model:", gbm_candidate))
+# [1] "GBM is a candidate model: FALSE"
+
+###########################################################################
+
+# Select the best model based on lowest test RMSE among candidate models
+candidate_models <- data.frame(
+  model = c("Random Forest", "Deep Learning", "GBM"),
+  test_rmse = c(rf_rmse_test, dl_rmse_test, gbm_rmse_test),
+  candidate = c(rf_candidate, dl_candidate, gbm_candidate)
+)
+
+# Filter only candidate models
+candidate_models <- candidate_models[candidate_models$candidate,]
+
+#now that we've filtered down to the least overfit, select the lowest RMSE among
+#the remaining models as the best model.
+if (nrow(candidate_models) > 0) {
+  best_model <- candidate_models[which.min(candidate_models$test_rmse), "model"]
+  print(paste("The best model is:", best_model))
+} else {
+  print("No suitable candidate models found.")
+}
+
+#The best model is Deep Learning. If we did not filter on the threshold, or 
+#raised the theshold high enough, Random Forest would be the victor as it has
+#the lowest RMSE, but has a higher difference between test and train RMSE.
+
+#############################################################################
+# use the best model (deep leanring) to make predictions and 
+#save as h2o_results.csv
+
+
+# load 'te' dataset into h2o cluster
+data2 <- as.h2o(te)
+names(data2)
+# 
+# # make predictions
+p <- h2o.predict(dl_model, data2)
+p <- as.data.frame(p)
+head(p)
+names(p) <- "predict"
+# 
+h2o_results <- data.frame(Id=te$Id, SalePrice=p$predict)
+write.table(x=h2o_results, sep=",", file="h2o_results_DL.csv", row.names=F)
+
+################################################################################
+# Q20 - In both the train and test sets, transform the 'y' target column to 
+# log(y). Then re-train a gradient boosting machine model. Comment out, but show
+# the performance on the train and test sets. Is this model overfit based on 
+# RMSE?
+################################################################################
+
+y <- "y"                                      # target variable to learn
+x <- setdiff(names(data), y)                  # features are all other columns
+parts <- h2o.splitFrame(data, 0.8, seed=99) # randomly partition data into 80/20
+train <- parts[[1]]                           # random set of training obs
+test <- parts[[2]]                            # random set of testing obs
+
+#In both the train and test sets, transform the 'y' target column to log(y).
+train$y <- log(train$y)
+test$y <- log(test$y)
+
+gbm_model <- h2o.gbm(x = x, y = y, training_frame = train, seed = 99)
+
+# Show performance on train and test sets for the transformed GBM model
+gbm_perf_train <- h2o.performance(gbm_model, train)
+gbm_perf_test <- h2o.performance(gbm_model, test)
+print(gbm_perf_train)
+print(gbm_perf_test)
+
+###########################Output#####################################
+# H2ORegressionMetrics: gbm
+# 
+# MSE:  0.005837169
+# RMSE:  0.07640137
+# MAE:  0.05436166
+# RMSLE:  0.005938262
+# Mean Residual Deviance :  0.005837169
+# 
+# >  print(gbm_perf_test)
+# H2ORegressionMetrics: gbm
+# 
+# MSE:  0.0211983
+# RMSE:  0.1455964
+# MAE:  0.09811242
+# RMSLE:  0.01125686
+# Mean Residual Deviance :  0.0211983
+#######################################################################
+
+# Calculate RMSE for train and test sets
+gbm_rmse_train <- h2o.rmse(gbm_perf_train)
+gbm_rmse_test <- h2o.rmse(gbm_perf_test)
+
+# Comment out the actual RMSE values obtained from the models
+# Transformed GBM Train RMSE: <insert_train_rmse_value_here>
+# Transformed GBM Test RMSE: <insert_test_rmse_value_here>
+
+# Determine if the model is overfit based on RMSE
+threshold <- .08 # using log, we can have a much smaller threshold
+is_overfit <- abs(gbm_rmse_test - gbm_rmse_train) >= threshold
+
+
+print(paste("Is the transformed GBM model overfit?:", is_overfit))
+
+###########################output########################################
+# >  print(paste("Is the transformed GBM model overfit?:", is_overfit))
+# [1] "Is the transformed GBM model overfit?: FALSE"
+#########################################################################
+
+#The model is probably not overfit. The difference in RMSE is around 0.069
+
+################################################################################
+# Q21 (2 points) - Use h2o's driverless AI functionality by using auto.ml. Set the max run
+# time (in seconds) to at least 300 (5 minutes). Once the the best (i.e. champion)
+# has been obtained, generate predictions on the 'te' dataset using that model.
+# Similarly to question 9, write our these predictions into a file called
+# "h2o_results.csv". Report your score.
+################################################################################
+
+
+y <- "y"                                      # target variable to learn
+x <- setdiff(names(data), y)                  # features are all other columns
+parts <- h2o.splitFrame(data, 0.8, seed=99) # randomly partition data into 80/20
+train <- parts[[1]]                           # random set of training obs
+test <- parts[[2]]                            # random set of testing obs
+
+#In both the train and test sets, transform the 'y' target column to log(y).
+train$y <- log(train$y)
+test$y <- log(test$y)
+
+# train with AutoML - specify how long you are willing to wait
+auto <- h2o.automl(x, y, train, max_runtime_secs=300)
+auto
+str(auto)
+
+# load 'te' dataset into h2o cluster
+data2 <- as.h2o(te)
+names(data2)
+
+# make predictions
+p <- h2o.predict(auto, data2)
+p <- as.data.frame(exp(p))
+head(p)
+names(p) <- "predict"
+
+h2o_results <- data.frame(Id=te$Id, SalePrice=p$predict)
+write.table(x=h2o_results, sep=",", file="h2o_results.csv", row.names=F)
+
+################################################################################
+# Q22 (4 points) - Create a simple shiny app that: 
+# a) pulls data from housing tr data from the dataset (make sure dbDisconnect(conn)
+#    is used right after you get the tr dataset)
+# b) generates a predictive model
+# c) plots the predicted SalePrice versus the actual SalePrice
+# d) shows train and test set statistics
+################################################################################
+
+###pulls from train.csv raw file instead of db since we're not on scholar.
+
+
+library(shiny)
+library(h2o)
+
+# Initialize H2O
+h2o.init()
+
+# Define the UI
+ui <- fluidPage(
+  titlePanel("Housing Data Predictive Model"),
+  
+  sidebarLayout(
+    sidebarPanel(
+      h3("Train and Test Statistics"),
+      tableOutput("trainStats"),
+      tableOutput("testStats")
+    ),
+    
+    mainPanel(
+      plotOutput("predPlot")
+    )
+  )
+)
+
+# Define the server
+server <- function(input, output) {
+  # Read data from the CSV file
+  housing_data <- read.csv("train.csv")
+  
+  # Convert data to H2OFrame
+  housing_data_h2o <- as.h2o(housing_data)
+  
+  # Specify the target and features
+  y <- "SalePrice"
+  x <- setdiff(names(housing_data_h2o), y)
+  
+  # Split the data into training and testing sets
+  parts <- h2o.splitFrame(housing_data_h2o, 0.8, seed = 1234)
+  train <- parts[[1]]
+  test <- parts[[2]]
+  
+  # Train a Gradient Boosting Machine model
+  gbm_model <- h2o.gbm(x = x, y = y, training_frame = train, seed = 99)
+  
+  # Generate predictions on the test set
+  predictions <- h2o.predict(gbm_model, test)
+  
+  # Convert predictions and actual values to data frames for plotting
+  pred_df <- as.data.frame(h2o.cbind(predictions, test[, y]))
+  colnames(pred_df) <- c("Predicted", "Actual")
+  
+  # Calculate statistics for train and test sets
+  train_perf <- h2o.performance(gbm_model, train)
+  test_perf <- h2o.performance(gbm_model, test)
+  
+  train_stats <- data.frame(
+    Metric = c("RMSE", "MAE", "R2"),
+    Value = c(h2o.rmse(train_perf), h2o.mae(train_perf), h2o.r2(train_perf))
+  )
+  
+  test_stats <- data.frame(
+    Metric = c("RMSE", "MAE", "R2"),
+    Value = c(h2o.rmse(test_perf), h2o.mae(test_perf), h2o.r2(test_perf))
+  )
+  
+  # Render the train and test statistics tables
+  output$trainStats <- renderTable({
+    train_stats
+  })
+  
+  output$testStats <- renderTable({
+    test_stats
+  })
+  
+  # Render the predicted vs actual plot
+  output$predPlot <- renderPlot({
+    plot(pred_df$Actual, pred_df$Predicted,
+         xlab = "Actual SalePrice",
+         ylab = "Predicted SalePrice",
+         main = "Predicted vs Actual SalePrice",
+         col = "blue", pch = 20)
+    abline(0, 1, col = "red", lwd = 2)
+  })
+}
+
+# Run the application 
+shinyApp(ui = ui, server = server)
