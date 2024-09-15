@@ -518,7 +518,7 @@ write.table(x=results, sep=",", file="results.csv", row.names=F)
 # student should show a rank and score 
 
 #Rank: 3432
-#Name: Jacob Halsey
+#Name: Ian Bach
 # Score 0.16122
 #Emtries 1
 #last 32s
