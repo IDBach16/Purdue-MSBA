@@ -1,0 +1,122 @@
+---
+title: 'Problem Set #4'
+author: "Ian Bach"
+date: "2024-09-13"
+output:
+  pdf_document:
+    latex_engine: xelatex
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+1.  (10 points) This question involves the Default dataset, which is included in the package ISLR2.
+
+(a) Fit a logistic regression that uses income and balance to predict default (Model 1). Report the estimates. [Hint: it should include an intercept.]
+(b) Suppose we classify an individual to the default category with a threshold probability of 0.5. Compute the LOOCV test error estimate for Model 1.
+(c) Now consider a logistic regression that predicts default using income, balance, and a dummy variable for student (Model 2). Compute the LOOCV test error estimate for this model. Should we include a dummy variable for student?
+
+1A.
+
+$$
+\text{logit}(P(\text{default}=1)) = \beta_0 + \beta_1 \times \text{income} + \beta_2 \times \text{balance}
+$$
+
+```{r P1A}
+# Load the necessary package and data
+library(ISLR2)
+
+# Fit a logistic regression model (Model 1)
+model1 <- glm(default ~ income + balance, data = Default, family = "binomial")
+
+# View the model summary to see the estimates
+summary(model1)
+
+
+```
+
+1B.
+
+```{r P1B}
+# Load the boot package
+library(boot)
+
+# Define a function to calculate the prediction error for LOOCV
+loocv_error <- function(model, data) {
+  # LOOCV using cv.glm from the boot package
+  loocv_result <- cv.glm(data, model, K = nrow(data))
+  return(loocv_result$delta[1])  # LOOCV estimate
+}
+
+# Calculate LOOCV error for Model 1
+loocv_model1 <- loocv_error(model1, Default)
+loocv_model1
+
+
+```
+
+1C.
+
+$$
+\text{logit}(P(\text{default}=1)) = \beta_0 + \beta_1 \times \text{income} + \beta_2 \times \text{balance} + \beta_3 \times \text{student}
+$$
+
+```{r P1C}
+# Fit a logistic regression model (Model 2) with student dummy variable
+model2 <- glm(default ~ income + balance + student, data = Default, family = "binomial")
+
+# Calculate LOOCV error for Model 2
+loocv_model2 <- loocv_error(model2, Default)
+loocv_model2
+
+```
+
+2.  (10 points) This question uses the bootstrap to estimate the standard errors under Model 2 in Exercise 1.
+
+(a) Write a function, boot.estimates, that takes as input the Default dataset and an index of the observations, and outputs the coefficient estimates of income, balance and student in a logistic regression (with an intercept).
+(b) Generate 1000 bootstrapped samples and use boot.estimates to estimate the standard errors of the coefficients corresponding to income, balance and student.
+
+2A.
+
+```{r 2A}
+# Define the boot.estimates function
+boot.estimates <- function(data, index) {
+  # Subset the data using the provided index
+  boot_sample <- data[index, ]
+  
+  # Fit a logistic regression model using the bootstrapped data
+  model <- glm(default ~ income + balance + student, data = boot_sample, family = "binomial")
+  
+  # Return the coefficients of income, balance, and student
+  return(coef(model)[c("income", "balance", "studentYes")])  # studentYes corresponds to the dummy for student
+}
+
+```
+
+2B.
+
+```{r 2B}
+# Load necessary library
+library(boot)
+
+# Define the bootstrap function to calculate estimates
+boot.estimates <- function(data, index) {
+  boot_sample <- data[index, ]
+  model <- glm(default ~ income + balance + student, data = boot_sample, family = "binomial")
+  return(coef(model)[c("income", "balance", "studentYes")])
+}
+
+# Perform the bootstrap with 1000 replications
+set.seed(123)  # For reproducibility
+boot_results <- boot(Default, boot.estimates, R = 1000)
+
+# View the bootstrap results
+boot_results
+
+# Calculate the standard errors of the coefficients
+boot_se <- apply(boot_results$t, 2, sd)
+boot_se
+
+```
