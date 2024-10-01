@@ -1,0 +1,321 @@
+---
+title: "Problem Set 6"
+author: "Ian Bach"
+date: "2024-09-25"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Question 1A
+
+-   Polynomial for $x \leq \xi$ $f_1(x)$
+
+For $x \leq \xi$, the term $(x - \xi)^3 = 0$, so the function simplifies to:
+
+$f_1(x) = \beta_0 + \beta_1 x + \beta_2 x^2 + \beta_3 x^3$
+
+Thus, $f_1(x)$ is a cubic polynomial for $x \leq \xi$ with coefficients:
+
+$a_1 = \beta_0$
+
+$b_1 = \beta_1$
+
+$c_1 = \beta_2$
+
+$d_1 = \beta_3$
+
+-   Polynomial for $x > \xi$ is $f_2(x)$:
+
+$f_2(x) = \beta_0 + \beta_1 x + \beta_2 x^2 + \beta_3 x^3 + \beta_4 (x - \xi)^3$
+
+The term $\beta_4 (x - \xi)^3$ is:
+
+$\beta_4 (x - \xi)^3 = \beta_4 (x^3 - 3\xi x^2 + 3\xi^2 x - \xi^3)$
+
+The function $f_2(x)$ becomes:
+
+$$
+f_2(x) = \beta_0 + \beta_1 x + \beta_2 x^2 + \beta_3 x^3 + \beta_4 (x^3 - 3\xi x^2 + 3\xi^2 x - \xi^3)
+$$
+
+$$
+f_2(x) = \beta_0 + \beta_1 x + \beta_2 x^2 + (\beta_3 + \beta_4) x^3 - 3\beta_4 \xi x^2 + 3\beta_4 \xi^2 x - \beta_4 \xi^3
+$$
+
+This will be written as:
+
+$$
+f_2(x) = (\beta_0 - \beta_4 \xi^3) + (\beta_1 + 3\beta_4 \xi^2) x + (\beta_2 - 3\beta_4 \xi) x^2 + (\beta_3 + \beta_4) x^3
+$$
+
+So the coefficients of $f_2(x)$ are:
+
+$$
+a_2 = \beta_0 - \beta_4 \xi^3
+$$
+
+$$
+b_2 = \beta_1 + 3 \beta_4 \xi^2
+$$
+
+$$
+c_2 = \beta_2 - 3 \beta_4 \xi
+$$
+
+$$
+d_2 = \beta_3 + \beta_4
+$$
+
+The cubic polynomial for $x > \xi$ is:
+
+$$
+f_2(x) = (\beta_0 - \beta_4 \xi^3) + (\beta_1 + 3\beta_4 \xi^2) x + (\beta_2 - 3\beta_4 \xi) x^2 + (\beta_3 + \beta_4) x^3
+$$
+
+## Question 1B
+
+For continuity at $x = \xi$, the values of $f_1(x)$ and $f_2(x)$ must be equal at $x = \xi$. That is:
+
+$$
+f_1(\xi) = f_2(\xi)
+$$
+
+Evaluate $f_1(\xi)$
+
+$f_1(\xi) = \beta_0 + \beta_1 \xi + \beta_2 \xi^2 + \beta_3 \xi^3$
+
+Evaluate $f_2(\xi)$
+
+Evaluate $f_2(\xi) = (\beta_0 - \beta_4 \xi^3) + (\beta_1 + 3 \beta_4 \xi^2) \xi + (\beta_2 - 3 \beta_4 \xi) \xi^2 + (\beta_3 + \beta_4) \xi^3$
+
+$$
+f_2(\xi) = \beta_0 + \beta_1 \xi + \beta_2 \xi^2 + \beta_3 \xi^3
+$$
+
+$$
+f_2(\xi) = \beta_0 + \beta_1 \xi + \beta_2 \xi^2 + (\beta_3 + \beta_4) \xi^3
+$$
+
+The following terms cancel out: $\beta_4$ and $\xi_3 \xi^3 \xi_3$
+
+$$
+f_2(\xi) = \beta_0 + \beta_1 \xi + \beta_2 \xi^2 + \beta_3 \xi^3
+$$
+
+$$
+f_1(\xi) = f_2(\xi)
+$$
+
+## Question 1C
+
+First, compute the first derivative of $f_1(x)$:
+
+$$
+f_1'(x) = \beta_1 + 2 \beta_2 x + 3 \beta_3 x^2
+$$
+
+At $x = \xi$:
+
+$$
+f_1'(\xi) = \beta_1 + 2 \beta_2 \xi + 3 \beta_3 \xi^2
+$$
+
+The first derivative of $f_2(x)$ is:
+
+$$
+f_2'(x) = \beta_1 + 2 \beta_2 x + 3 \beta_3 x^2
+$$
+
+$$
+f_2'(x) = \beta_1 + 3 \beta_4 \xi^2 + 2 (\beta_2 - 3 \beta_4 \xi) x + 3 (\beta_3 + \beta_4) x^2
+$$
+
+At $x = \xi$:
+
+$$
+f_2'(\xi) = \beta_1 + 3 \beta_4 \xi^2 + 2 (\beta_2 - 3 \beta_4 \xi) \xi + 3 (\beta_3 + \beta_4) \xi^2
+$$
+
+Simplify:
+
+$$
+f_2'(\xi) = \beta_1 + 3 \beta_4 \xi^2 + 2 \beta_2 \xi - 6 \beta_4 \xi^2 + 3 \beta_3 \xi^2 + 3 \beta_4 \xi^2
+$$
+
+After combining like terms:
+
+$$
+f_2'(\xi) = \beta_1 + 2 \beta_2 \xi + 3 \beta_3 \xi^2
+$$
+
+Thus:
+
+$$
+f_1'(\xi) = f_2'(\xi)
+$$
+
+This confirms that the first derivative is continuous at $x = \xi$.
+
+## Question 1D
+
+The second derivative of $f_1(x)$ is:
+
+$$
+f_1''(x) = 2 \beta_2 + 6 \beta_3 x
+$$
+
+At $x = \xi$:
+
+$$
+f_1''(\xi) = 2 \beta_2 + 6 \beta_3 \xi
+$$
+
+The second derivative of $f_2(x)$ is:
+
+$$
+f_2''(x) = 2 (\beta_2 - 3 \beta_4 \xi) + 6 (\beta_3 + \beta_4) x
+$$
+
+At $x = \xi$:
+
+$$
+f_2''(\xi) = 2 (\beta_2 - 3 \beta_4 \xi) + 6 (\beta_3 + \beta_4) \xi
+$$
+
+Simplifying:
+
+$$
+f_2''(\xi) = 2 \beta_2 - 6 \beta_4 \xi + 6 \beta_3 \xi + 6 \beta_4 \xi
+$$
+
+The $\beta_4$ terms cancel out, so:
+
+$$
+f_2''(\xi) = 2 \beta_2 + 6 \beta_3 \xi
+$$
+
+Thus:
+
+$$
+f_1''(\xi) = f_2''(\xi)
+$$
+
+This confirms that the second derivative is continuous at $x = \xi$.
+
+## Question 2A
+
+$$
+\lambda = \infty, m = 0
+$$
+
+
+-   When $\lambda = \infty$, the penalty term dominates. In this case, since $m = 0$, the penalty applies directly to $g(x)$ itself, implying that $g_b(x)$ must be constant. This is because the only way to minimize the penalty term $\int [g(x)]^2 dx$ when $\lambda$ is very large is for $g(x)$ to be a constant function.
+
+-   **Result:** $g_b(x)$ is a constant function, likely the mean of the $y_i$'s.
+
+## Question 2B
+
+$$
+\lambda = \infty, m = 1
+$$
+
+
+-   With $\lambda = \infty$ and $m = 1$, the penalty applies to the first derivative $g'(x)$. To minimize the penalty, $g'(x) = 0$, meaning $g(x)$ must be a constant function again.
+
+-   **Result:** $g_b(x)$ is constant, same as in part (a).
+
+## Question 2C
+
+$$
+\lambda = \infty, m = 2
+$$
+
+
+-   For $\lambda = \infty$ and $m = 2$, the penalty applies to the second derivative $g''(x)$. Minimizing the penalty forces $g''(x) = 0$, meaning $g_b(x)$ must be a linear function (since a function with zero second derivative is a straight line).
+
+-   **Result:** $g_b(x)$ is a linear function, $g_b(x) = ax + b$, where $a$ and $b$ are constants.
+
+## Question 2D
+
+$$
+\lambda = \infty, m = 3
+$$
+
+
+-   For $\lambda = \infty$ and $m = 3$, the penalty applies to the third derivative $g^{(3)}(x)$. Minimizing the penalty forces $g^{(3)}(x) = 0$, meaning $g_b(x)$ must be a quadratic function (since a function with zero third derivative is a quadratic polynomial).
+
+-   **Result:** $g_b(x)$ is a quadratic function, $g_b(x) = ax^2 + bx + c$, where $a$, $b$, and $c$ are constants.
+
+## Question 2E
+
+$$
+\lambda = \infty, m = 2
+$$
+
+
+-   When $\lambda = 0$, there is no penalty for roughness, so $g_b(x)$ will minimize the first term in the loss function alone. This would make $g_b(x)$ exactly interpolate the data points, meaning it passes through every $(x_i, y_i)$ pair. Since $m = 2$, we would expect a smooth curve, but the penalty term doesn't influence the result when $\lambda = 0$.
+
+-   **Result:** $g_b(x)$ will interpolate the data points and can be any flexible, non-penalized smooth curve.
+
+## Question 3A
+
+```{r}
+library(ISLR)
+library(splines)
+
+# Load the Wage dataset
+data(Wage)
+
+# Fit the model using cubic splines with knots at 30, 50, and 60
+fit_cubic_spline <- lm(wage ~ bs(age, knots = c(30, 50, 60), degree = 3), data = Wage)
+
+# Plot the data
+plot(Wage$age, Wage$wage, col = "gray", xlab = "Age", ylab = "Wage")
+
+# Add the fitted spline curve to the plot
+age_grid <- seq(min(Wage$age), max(Wage$age), length.out = 100)
+wage_preds <- predict(fit_cubic_spline, newdata = list(age = age_grid))
+lines(age_grid, wage_preds, col = "blue", lwd = 2)
+
+predict(fit_cubic_spline, newdata = list(age = 30))
+
+```
+
+## Question 3B
+
+```{r}
+# Fit the smoothing spline with cross-validation
+fit_smoothing_spline <- smooth.spline(Wage$age, Wage$wage, cv = TRUE)
+
+# Plot the data
+plot(Wage$age, Wage$wage, col = "gray", xlab = "Age", ylab = "Wage")
+
+# Add the fitted smoothing spline curve
+lines(fit_smoothing_spline, col = "red", lwd = 2)
+
+predict(fit_smoothing_spline, x = 30)$y
+
+```
+
+## Question 3C
+
+```{r}
+library(gam)
+
+# Fit the GAM model
+fit_gam <- gam(wage ~ ns(age, df = 4) + maritl, data = Wage)
+
+# Plot the effects of the GAM model
+plot(fit_gam, se = TRUE)
+
+# Plot the effects of the GAM model
+plot(fit_gam, se = TRUE)
+
+predict(fit_gam, newdata = data.frame(age = 30, maritl = "2. Married"))
+
+```
